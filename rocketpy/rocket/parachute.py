@@ -24,7 +24,7 @@ class Parachute:
         This parameter defines the trigger condition for the parachute ejection
         system. It can be one of the following:
 
-        - A callable function that takes three arguments:
+        - A callable function that takes up to five arguments:
         1. Freestream pressure in pascals.
         2. Height in meters above ground level.
         3. The state vector of the simulation, which is defined as:
@@ -35,6 +35,10 @@ class Parachute:
            measurements of the sensors are provided with the
            ``sensor.measurement`` attribute. The sensors are listed in the same
            order as they are added to the rocket.
+        5. Current simulation time in seconds.
+
+        Functions with 3, 4, or 5 parameters are supported for backward
+        compatibility.
 
         The function should return ``True`` if the parachute ejection system
         should be triggered and False otherwise. The function will be called
@@ -134,7 +138,7 @@ class Parachute:
             Defines the trigger condition for the parachute ejection system. It
             can be one of the following:
 
-            - A callable function that takes three arguments: \
+            - A callable function that takes up to five arguments: \
 
                 1. Freestream pressure in pascals.
                 2. Height in meters above ground level.
@@ -143,6 +147,11 @@ class Parachute:
                     .. code-block:: python
 
                         u = [x, y, z, vx, vy, vz, e0, e1, e2, e3, wx, wy, wz]
+
+                4. A list of sensors attached to the rocket (optional).
+                5. Current simulation time in seconds (optional).
+
+                Functions with 3, 4, or 5 parameters are supported.
 
                 .. note::
 
@@ -222,24 +231,42 @@ class Parachute:
     def __evaluate_trigger_function(self, trigger):
         """This is used to set the triggerfunc attribute that will be used to
         interact with the Flight class.
+
+        The internal triggerfunc always has the signature:
+            triggerfunc(p, h, y, sensors, time) -> bool
+
+        User-provided callables with 3, 4, or 5 parameters are wrapped
+        to match this signature for backward compatibility.
         """
         # pylint: disable=unused-argument, function-redefined
         # The parachute is deployed by a custom function
         if callable(trigger):
-            # work around for having added sensors to parachute triggers
-            # to avoid breaking changes
-            triggerfunc = trigger
-            sig = signature(triggerfunc)
-            if len(sig.parameters) == 3:
+            sig = signature(trigger)
+            num_params = len(sig.parameters)
 
-                def triggerfunc(p, h, y, sensors):
+            if num_params == 5:
+                # New signature: (p, h, y, sensors, time)
+                self.triggerfunc = trigger
+            elif num_params == 4:
+                # Current signature: (p, h, y, sensors) - wrap to add time
+                def triggerfunc(p, h, y, sensors, time):
+                    return trigger(p, h, y, sensors)
+
+                self.triggerfunc = triggerfunc
+            elif num_params == 3:
+                # Legacy signature: (p, h, y) - wrap to add sensors and time
+                def triggerfunc(p, h, y, sensors, time):
                     return trigger(p, h, y)
 
-            self.triggerfunc = triggerfunc
+                self.triggerfunc = triggerfunc
+            else:
+                raise ValueError(
+                    f"Trigger function must have 3, 4, or 5 parameters, got {num_params}"
+                )
 
         elif isinstance(trigger, (int, float)):
             # The parachute is deployed at a given height
-            def triggerfunc(p, h, y, sensors):  # pylint: disable=unused-argument
+            def triggerfunc(p, h, y, sensors, time):  # pylint: disable=unused-argument
                 # p = pressure considering parachute noise signal
                 # h = height above ground level considering parachute noise signal
                 # y = [x, y, z, vx, vy, vz, e0, e1, e2, e3, w1, w2, w3]
@@ -249,7 +276,7 @@ class Parachute:
 
         elif trigger.lower() == "apogee":
             # The parachute is deployed at apogee
-            def triggerfunc(p, h, y, sensors):  # pylint: disable=unused-argument
+            def triggerfunc(p, h, y, sensors, time):  # pylint: disable=unused-argument
                 # p = pressure considering parachute noise signal
                 # h = height above ground level considering parachute noise signal
                 # y = [x, y, z, vx, vy, vz, e0, e1, e2, e3, w1, w2, w3]
