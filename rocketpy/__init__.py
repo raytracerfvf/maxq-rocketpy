@@ -7,6 +7,7 @@ from .mathutils import (
     reset_funcified_methods,
 )
 from .motors import (
+    ClusterMotor,
     CylindricalTank,
     EmptyMotor,
     Fluid,
