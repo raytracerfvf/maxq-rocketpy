@@ -19,7 +19,7 @@ class TestParachuteTriggerSignatures:
         deploy_time = 5.0
         received_time = None
 
-        def time_trigger(p, h, y, sensors, time):
+        def time_trigger(_p, _h, _y, _sensors, time):
             nonlocal received_time
             received_time = time
             return time >= deploy_time
@@ -46,7 +46,7 @@ class TestParachuteTriggerSignatures:
     def test_trigger_with_4_parameters_backward_compatible(self):
         """Test that 4-parameter triggers still work (backward compatibility)."""
 
-        def old_trigger(p, h, y, sensors):
+        def old_trigger(_p, h, _y, _sensors):
             return h < 100
 
         parachute = Parachute(
@@ -63,7 +63,7 @@ class TestParachuteTriggerSignatures:
     def test_trigger_with_3_parameters_backward_compatible(self):
         """Test that 3-parameter legacy triggers still work."""
 
-        def legacy_trigger(p, h, y):
+        def legacy_trigger(_p, h, y):
             return h < 100 and y[5] < 0  # altitude check with descending
 
         parachute = Parachute(
@@ -87,7 +87,7 @@ class TestParachuteTriggerSignatures:
     def test_trigger_with_invalid_parameter_count_raises(self):
         """Test that triggers with invalid parameter counts raise ValueError."""
 
-        def bad_trigger(p, h):  # Only 2 parameters
+        def bad_trigger(_p, h):  # Only 2 parameters
             return h < 100
 
         with pytest.raises(ValueError, match="must have 3, 4, or 5 parameters"):
@@ -146,7 +146,7 @@ class TestTimeTriggerUseCases:
         delay = 2.0
         deploy_time = burnout_time + delay
 
-        def burnout_delay_trigger(p, h, y, sensors, time):
+        def burnout_delay_trigger(_p, _h, _y, _sensors, time):
             return time >= deploy_time
 
         parachute = Parachute(
@@ -172,7 +172,7 @@ class TestTimeTriggerUseCases:
         """Test a trigger that fires at absolute flight time."""
         flight_time = 15.0
 
-        def flight_time_trigger(p, h, y, sensors, time):
+        def flight_time_trigger(_p, _h, _y, _sensors, time):
             return time >= flight_time
 
         parachute = Parachute(
