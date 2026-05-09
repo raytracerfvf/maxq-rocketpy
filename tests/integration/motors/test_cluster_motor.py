@@ -144,9 +144,9 @@ def test_cluster_methods_and_setters(base_motor):
     cluster.draw_cluster_layout(show=False)
     cluster.draw_cluster_layout(rocket_radius=0.1, show=False)
 
-    # 3. Touch a few setters
-    cluster.propellant_mass = 50.0
-    assert cluster.propellant_mass == 50.0
+    # 3. Touch a few setters with values of the documented Function type
+    cluster.propellant_mass = Function(50.0)
+    assert cluster.propellant_mass(0) == 50.0
 
-    cluster.propellant_I_11 = 2.0
-    assert cluster.propellant_I_11 == 2.0
+    cluster.propellant_I_11 = Function(2.0)
+    assert cluster.propellant_I_11(0) == 2.0

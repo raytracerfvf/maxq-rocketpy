@@ -663,6 +663,15 @@ class Flight:
             # Create solver for this flight phase
             self.function_evaluations.append(0)
 
+            # Adaptive solvers can step over an impulsive burn entirely when
+            # thrust is zero at both endpoints; clamp during the burn phase only.
+            phase_max_step = self.max_time_step
+            motor = self.rocket.motor
+            burn_out = float(getattr(motor, "burn_out_time", 0) or 0)
+            total_impulse = float(getattr(motor, "total_impulse", 0) or 0)
+            if total_impulse > 0 and burn_out > 0 and phase.t < burn_out:
+                phase_max_step = min(phase_max_step, burn_out / 10)
+
             phase.solver = self._solver(
                 phase.derivative,
                 t0=phase.t,
@@ -670,7 +679,7 @@ class Flight:
                 t_bound=phase.time_bound,
                 rtol=self.rtol,
                 atol=self.atol,
-                max_step=self.max_time_step,
+                max_step=phase_max_step,
                 min_step=self.min_time_step,
             )
 
