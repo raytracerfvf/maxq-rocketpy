@@ -13,6 +13,61 @@ python benchmark_solver.py -o bench_current.json --processes 6 --values 5 --warm
 python -m pyperf show bench_current.json
 ```
 
+## 0. Complete timing breakdown of an LSODA Calisto flight
+
+Where the **829 ms** goes, measured with a low-overhead sampling profiler
+([`py-spy`](https://github.com/benfred/py-spy), 71,884 samples over 90 flights)
+so proportions are undistorted (cProfile inflates high-call-count Python
+functions). Numbers are anchored to the pyperf mean and exclude one-time
+process startup/import and per-iteration scenario setup.
+
+Reproduce:
+
+```bash
+pip install py-spy
+py-spy record --rate 500 --format raw --idle -o spy_folded.txt -- python run_loop.py 90
+python tools/analyze_spy.py   # prints the tables below
+```
+
+**Top level (clean partition by call-site):**
+
+| Activity | Share | Time |
+|----------|-------|------|
+| **STEPPING** (solver integrating the EOM) | 58.0% | 481 ms |
+| **OVERSHOOT** (per-step parachute-trigger checking) | 39.0% | 324 ms |
+| OTHER (flight loop bookkeeping) | 3.0% | 25 ms |
+
+**STEPPING — 481 ms — by subsystem:**
+
+| Subsystem | Time | Note |
+|-----------|------|------|
+| Vector/Matrix algebra | 130 ms | EOM assembly; many small `Vector`/`Matrix` objects |
+| Derivative self / EOM assembly | 84 ms | `u_dot_generalized` body |
+| Interpolation kernels | 83 ms | spline/linear/extrap evaluation |
+| Function dispatch/overhead | 78 ms | `get_value_opt` plumbing |
+| Aerodynamic surfaces | 54 ms | fins/nose/tail force & moment |
+| scipy solver internals | 28 ms | **the actual LSODA stepper — only 3.4%** |
+| Differentiation (complex-step) | 10 ms | per-step mass/inertia derivatives |
+| Rocket/motor properties | 6 ms | |
+
+**OVERSHOOT — 324 ms — by subsystem:**
+
+| Subsystem | Time | Note |
+|-----------|------|------|
+| scipy solver internals | 96 ms | `dense_output()` interpolation at each sub-node |
+| Interpolation kernels | 84 ms | atmospheric/pressure `Function` lookups |
+| Overshoot/node bookkeeping | 51 ms | building/sorting/merging `TimeNode`s every step |
+| Parachute trigger eval | 38 ms | `triggerfunc` |
+| Flight loop bookkeeping | 32 ms | |
+| Pressure-signal calc | 14 ms | noisy pressure |
+
+**Cross-cutting:** the `Function` evaluation subsystem (interpolation kernels +
+dispatch) totals **~254 ms (~31%)** across both activities — the single largest
+theme — followed by Vector/Matrix algebra (~130 ms, 16%). The LSODA stepper
+itself is ~28 ms (3.4%); `dense_output` for overshoot adds ~96 ms.
+
+See `tools/calisto_lsoda_flame.svg` for the full flamegraph.
+
 ## 1. LSODA is the right default
 
 Same flight, default tolerances (`rtol=atol=1e-6`):
