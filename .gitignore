@@ -172,4 +172,8 @@ docs/*.gif
 .idea/
 
 # Mac
-.DS_Storebench_*.json
+.DS_Store
+
+# Benchmark result artifacts
+bench_*.json
+
