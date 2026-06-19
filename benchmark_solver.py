@@ -70,16 +70,27 @@ def build_scenario():
     return env, rocket
 
 
-ENV, ROCKET = build_scenario()
+def make_bench(ode_solver="LSODA", rtol=1e-6, atol=1e-6, time_overshoot=True):
+    """Return a pyperf time-func that builds a *fresh* scenario each iteration
+    (setup excluded from the timer) and times only the Flight simulation.
+    A fresh rocket/env per iteration avoids any cross-run state carryover.
+    """
 
+    def bench(loops):
+        total = 0.0
+        for _ in range(loops):
+            env, rocket = build_scenario()  # setup -- not timed
+            t0 = pyperf.perf_counter()
+            Flight(
+                rocket=rocket, environment=env,
+                rail_length=5.2, inclination=85, heading=0,
+                ode_solver=ode_solver, rtol=rtol, atol=atol,
+                time_overshoot=time_overshoot,
+            )
+            total += pyperf.perf_counter() - t0
+        return total
 
-def simulate(ode_solver="LSODA", rtol=1e-6, atol=1e-6, time_overshoot=True):
-    Flight(
-        rocket=ROCKET, environment=ENV,
-        rail_length=5.2, inclination=85, heading=0,
-        ode_solver=ode_solver, rtol=rtol, atol=atol,
-        time_overshoot=time_overshoot,
-    )
+    return bench
 
 
 if __name__ == "__main__":
@@ -87,12 +98,11 @@ if __name__ == "__main__":
 
     # Canonical workload + solver comparison (default tolerances)
     for solver in ["LSODA", "RK45", "DOP853", "BDF", "Radau"]:
-        runner.bench_func(
-            f"flight_{solver}", simulate, solver, 1e-6, 1e-6, True
-        )
+        runner.bench_time_func(f"flight_{solver}", make_bench(solver))
 
     # Tolerance sweep (LSODA) -- the accuracy/speed dial
     for rtol in [1e-6, 1e-5, 1e-4, 1e-3]:
-        runner.bench_func(
-            f"flight_LSODA_rtol{rtol:.0e}", simulate, "LSODA", rtol, rtol, True
+        runner.bench_time_func(
+            f"flight_LSODA_rtol{rtol:.0e}",
+            make_bench("LSODA", rtol, rtol),
         )
