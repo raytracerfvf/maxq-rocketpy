@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 import math
+import time
 import warnings
 from copy import deepcopy
 from functools import cached_property
@@ -504,6 +505,7 @@ class Flight:
         equations_of_motion="standard",
         ode_solver="LSODA",
         simulation_mode="6 DOF",
+        max_wall_time=None,
     ):
         """Run a trajectory simulation.
 
@@ -587,6 +589,10 @@ class Flight:
             A custom ``scipy.integrate.OdeSolver`` can be passed as well.
             For more information on the integration methods, see the scipy
             documentation [1]_.
+        max_wall_time : int, float, optional
+            Maximum wall-clock time in seconds before aborting the simulation.
+            The check is cooperative and runs after each successful solver step.
+            Default is None, which disables the wall-clock watchdog.
         Returns
         -------
         None
@@ -616,6 +622,9 @@ class Flight:
         self.equations_of_motion = equations_of_motion
         self.simulation_mode = simulation_mode
         self.ode_solver = ode_solver
+        if max_wall_time is not None and max_wall_time <= 0:
+            raise ValueError("max_wall_time must be positive or None.")
+        self.max_wall_time = max_wall_time
 
         # Controller initialization
         self.__init_controllers()
@@ -652,6 +661,7 @@ class Flight:
     # pylint: disable=too-many-nested-blocks, too-many-branches, too-many-locals,too-many-statements
     def __simulate(self, verbose):
         """Simulate the flight trajectory."""
+        wall_time_start = time.monotonic()
         for phase_index, phase in self.time_iterator(self.flight_phases):
             # Determine maximum time for this flight phase
             phase.time_bound = self.flight_phases[phase_index + 1].t
@@ -794,6 +804,7 @@ class Flight:
                     # Update time and state
                     self.t = phase.solver.t
                     self.y_sol = phase.solver.y
+                    self.__check_max_wall_time(wall_time_start, phase.solver)
                     if verbose:
                         print(f"Current Simulation Time: {self.t:3.4f} s", end="\r")
 
@@ -820,6 +831,22 @@ class Flight:
             self.__cache_sensor_data()
         if verbose:
             print(f"\n>>> Simulation Completed at Time: {self.t:3.4f} s")
+
+    def __check_max_wall_time(self, wall_time_start, solver):
+        """Abort when the cooperative wall-clock watchdog is exceeded."""
+        if self.max_wall_time is None:
+            return
+
+        elapsed = time.monotonic() - wall_time_start
+        if elapsed <= self.max_wall_time:
+            return
+
+        raise TimeoutError(
+            "Flight simulation exceeded max_wall_time="
+            f"{self.max_wall_time:.3f} s after {elapsed:.3f} s "
+            f"wall time at simulation t={float(solver.t):.6g} s "
+            f"(steps={len(self.solution) - 1}, nfev={solver.nfev})."
+        )
 
     def __setup_phase_time_nodes(self, phase):
         """Set up time nodes for the current phase.
@@ -4173,6 +4200,7 @@ class Flight:
             "max_time": self.max_time,
             "max_time_step": self.max_time_step,
             "min_time_step": self.min_time_step,
+            "max_wall_time": self.max_wall_time,
             "rtol": self.rtol,
             "atol": self.atol,
             "time_overshoot": self.time_overshoot,
@@ -4257,6 +4285,7 @@ class Flight:
             max_time=data["max_time"],
             max_time_step=data["max_time_step"],
             min_time_step=data["min_time_step"],
+            max_wall_time=data.get("max_wall_time"),
             rtol=data["rtol"],
             atol=data["atol"],
             time_overshoot=data["time_overshoot"],

@@ -93,6 +93,8 @@ class _FlightPrints:
         print(f"Maximum Allowed Flight Time: {self.flight.max_time:.2f} s")
         print(f"Maximum Allowed Time Step: {self.flight.max_time_step:.2f} s")
         print(f"Minimum Allowed Time Step: {self.flight.min_time_step:.2e} s")
+        if self.flight.max_wall_time is not None:
+            print(f"Maximum Allowed Wall Time: {self.flight.max_wall_time:.2f} s")
         print(f"Relative Error Tolerance: {self.flight.rtol}")
         print(f"Absolute Error Tolerance: {self.flight.atol}")
         print(f"Allow Event Overshoot: {self.flight.time_overshoot}")

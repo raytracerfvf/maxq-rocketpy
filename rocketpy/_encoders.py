@@ -151,6 +151,7 @@ def set_minimal_flight_attributes(flight, obj):
         "max_time",
         "max_time_step",
         "min_time_step",
+        "max_wall_time",
         "rtol",
         "atol",
         "time_overshoot",

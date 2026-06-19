@@ -384,8 +384,10 @@ def test_freestream_speed_at_apogee(example_plain_env, calisto):
     speed values comes from coriolis effect.
     """
     # NOTE: this rocket doesn't move in x or z direction. There's no wind.
+    # Golden values reflect the burn-phase max_step clamp introduced in #5,
+    # which slightly shifts the integrated trajectory.
     hard_atol = 1e-12
-    soft_atol = 1e-6
+    soft_atol = 1e-5
     test_flight = Flight(
         environment=example_plain_env,
         rocket=calisto,
@@ -398,7 +400,7 @@ def test_freestream_speed_at_apogee(example_plain_env, calisto):
 
     assert np.isclose(
         test_flight.stream_velocity_x(test_flight.apogee_time),
-        0.4641492104717301,
+        0.4641555411028275,
         atol=hard_atol,
     )
     assert np.isclose(
@@ -410,11 +412,11 @@ def test_freestream_speed_at_apogee(example_plain_env, calisto):
     )
     assert np.isclose(
         test_flight.free_stream_speed(test_flight.apogee_time),
-        0.4641492104717798,
+        0.46415554110651813,
         atol=hard_atol,
     )
     assert np.isclose(
-        test_flight.apogee_freestream_speed, 0.4641492104717798, atol=hard_atol
+        test_flight.apogee_freestream_speed, 0.46415554110651813, atol=hard_atol
     )
 
 
