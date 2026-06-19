@@ -43,6 +43,30 @@ def _make_short_burn_motor():
     )
 
 
+def _make_near_instant_burn_motor():
+    # Degenerate "empty" placeholder: positive-but-negligible impulse over a
+    # near-zero burn (burn_out_time=1e-10 s). burn_out/10 = 1e-11 s, which the
+    # burn-phase clamp must NOT impose as max_step (it would stall the solver).
+    return SolidMotor(
+        thrust_source=1e-300,
+        burn_time=1e-10,
+        dry_mass=0.0615,
+        dry_inertia=(9.29e-5, 9.29e-5, 8.86e-6),
+        center_of_dry_mass_position=0.0665,
+        nozzle_position=0.0,
+        grain_number=2,
+        grain_density=1e-300,
+        grain_outer_radius=0.0104,
+        grain_initial_inner_radius=0.00585,
+        grain_initial_height=0.0359,
+        grain_separation=0.0012,
+        grains_center_of_mass_position=0.0635,
+        nozzle_radius=0.0091,
+        throat_radius=0.0034,
+        coordinate_system_orientation="nozzle_to_combustion_chamber",
+    )
+
+
 def _make_light_rocket(motor):
     rocket = Rocket(
         radius=0.025,
@@ -94,3 +118,31 @@ def test_short_burn_motor_lifts_off_with_default_max_time_step():
         f"apogee={flight.apogee:.1f} m too low for an F240-class motor; "
         "burn was probably skipped"
     )
+
+
+def test_near_instant_burn_does_not_stall_solver():
+    """A degenerate near-zero burn must not clamp max_step into a stall.
+
+    Regression for the burn-phase clamp: burn_out/10 = 1e-11 s for this motor.
+    Before the MIN_BURN_CLAMP_STEP guard the solver was pinned to that step and
+    crawled toward max_time (~1e11 steps), hanging the simulation indefinitely.
+    """
+    motor = _make_near_instant_burn_motor()
+    rocket = _make_light_rocket(motor)
+
+    # Positive impulse (clamp's first gate) but a degenerate burn window.
+    assert motor.total_impulse > 0
+
+    flight = Flight(
+        environment=Environment(),
+        rocket=rocket,
+        rail_length=2.0,
+        inclination=90,
+        heading=0,
+        max_time=2.0,
+        max_time_step=1e-2,
+    )
+
+    # With the clamp skipped, max_time_step=1e-2 over max_time=2 s keeps the
+    # solution bounded (~200 points). A regressed clamp would explode this.
+    assert len(flight.solution) < 5000
