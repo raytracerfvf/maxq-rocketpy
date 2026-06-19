@@ -797,7 +797,15 @@ class Flight:
                 # Step through simulation
                 while phase.solver.status == "running":
                     # Execute solver step, log solution and function evaluations
-                    phase.solver.step()
+                    step_message = phase.solver.step()
+                    if phase.solver.status == "failed":
+                        details = f": {step_message}" if step_message else "."
+                        raise RuntimeError(
+                            "Flight simulation solver failed "
+                            f"at simulation t={float(phase.solver.t):.6g} s "
+                            f"(steps={len(self.solution) - 1}, nfev={phase.solver.nfev})"
+                            f"{details}"
+                        )
                     self.solution += [[phase.solver.t, *phase.solver.y]]
                     self.function_evaluations.append(phase.solver.nfev)
 
