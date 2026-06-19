@@ -45,3 +45,35 @@ def test_flight_max_wall_time_must_be_positive():
             terminate_on_apogee=True,
             max_wall_time=0,
         )
+
+
+def test_flight_raises_when_solver_reports_failure(monkeypatch):
+    """A failed SciPy solver step must not produce a partial Flight object."""
+
+    class FailingSolver:
+        def __init__(self, fun, t0, y0, t_bound, **kwargs):
+            self.t = t0
+            self.y = y0
+            self.t_bound = t_bound
+            self.status = "running"
+            self.nfev = 0
+
+        def step(self):
+            self.status = "failed"
+            self.nfev = 3
+            return "synthetic solver failure"
+
+    monkeypatch.setitem(flight_module.ODE_SOLVER_MAP, "LSODA", FailingSolver)
+
+    motor = _make_short_burn_motor()
+    rocket = _make_light_rocket(motor)
+
+    with pytest.raises(RuntimeError, match="synthetic solver failure"):
+        Flight(
+            environment=Environment(),
+            rocket=rocket,
+            rail_length=2.0,
+            inclination=90,
+            heading=0,
+            terminate_on_apogee=True,
+        )
