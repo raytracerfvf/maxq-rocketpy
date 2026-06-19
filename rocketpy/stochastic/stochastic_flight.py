@@ -32,6 +32,9 @@ class StochasticFlight(StochasticModel):
     time_overshoot : bool
         If False, the simulation will run at the time step defined by the controller
         sampling rate. Be aware that this will make the simulation run much slower.
+    max_wall_time : int, float
+        Maximum wall-clock time in seconds before aborting each Flight simulation.
+        This attribute can not be randomized.
     """
 
     def __init__(
@@ -43,6 +46,7 @@ class StochasticFlight(StochasticModel):
         initial_solution=None,
         terminate_on_apogee=None,
         time_overshoot=None,
+        max_wall_time=None,
     ):
         """Initializes the Stochastic Flight class.
 
@@ -70,6 +74,9 @@ class StochasticFlight(StochasticModel):
         time_overshoot : bool
             If False, the simulation will run at the time step defined by the controller
             sampling rate. Be aware that this will make the simulation run much slower.
+        max_wall_time : int, float
+            Maximum wall-clock time in seconds before aborting each Flight simulation.
+            This attribute can not be randomized.
         """
         if terminate_on_apogee is not None:
             assert isinstance(terminate_on_apogee, bool), (
@@ -91,6 +98,10 @@ class StochasticFlight(StochasticModel):
             self.time_overshoot = flight.time_overshoot
         else:
             self.time_overshoot = time_overshoot
+        if max_wall_time is None:
+            self.max_wall_time = flight.max_wall_time
+        else:
+            self.max_wall_time = max_wall_time
 
     def _validate_initial_solution(self, initial_solution):
         if initial_solution is not None:
@@ -143,4 +154,5 @@ class StochasticFlight(StochasticModel):
             initial_solution=self.initial_solution,
             terminate_on_apogee=self.terminate_on_apogee,
             time_overshoot=self.time_overshoot,
+            max_wall_time=self.max_wall_time,
         )

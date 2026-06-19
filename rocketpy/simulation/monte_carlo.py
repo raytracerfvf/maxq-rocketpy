@@ -462,6 +462,7 @@ class MonteCarlo:
             initial_solution=self.flight.initial_solution,
             terminate_on_apogee=self.flight.terminate_on_apogee,
             time_overshoot=self.flight.time_overshoot,
+            max_wall_time=self.flight.max_wall_time,
         )
 
     def estimate_confidence_interval(
