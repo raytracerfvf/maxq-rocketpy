@@ -42,6 +42,46 @@ INTERPOLATION_TYPES = {
 EXTRAPOLATION_TYPES = {"zero": 0, "natural": 1, "constant": 2}
 
 
+def _cached_bisect_left(x_data, x, cache):
+    """Locate the interval index of ``x`` in the sorted array ``x_data``,
+    reusing a cached index when consecutive queries fall in the same or the
+    adjacent interval.
+
+    This returns exactly the same value as ``bisect.bisect_left(x_data, x)``,
+    but during ODE integration successive evaluations query nearly the same
+    abscissa, so the cached fast paths usually avoid a full binary search.
+
+    Parameters
+    ----------
+    x_data : numpy.ndarray
+        Strictly increasing array of abscissas.
+    x : scalar
+        Value to locate.
+    cache : list
+        Single-element mutable container holding the last returned index.
+        Created once per interpolation closure (i.e. per ``Function``).
+
+    Returns
+    -------
+    int
+        Insertion index, identical to ``bisect_left(x_data, x)``.
+    """
+    i = cache[0]
+    n = len(x_data)
+    # Same interval as the previous query: x_data[i-1] < x <= x_data[i]
+    if 0 < i < n and x_data[i - 1] < x <= x_data[i]:
+        return i
+    # Next interval (typical for forward integration steps)
+    j = i + 1
+    if 0 < j < n and x_data[j - 1] < x <= x_data[j]:
+        cache[0] = j
+        return j
+    # Cache miss: fall back to a full binary search and update the cache.
+    i = bisect_left(x_data, x)
+    cache[0] = i
+    return i
+
+
 class SourceType(Enum):
     """Enumeration of the source types for the Function class.
     The source can be either a callable or an array.
@@ -509,9 +549,10 @@ class Function:  # pylint: disable=too-many-public-methods
         match interpolation:
             case 0:  # linear
                 if self.__dom_dim__ == 1:
+                    bisect_cache = [1]
 
                     def linear_interpolation(x, x_min, x_max, x_data, y_data, coeffs):  # pylint: disable=unused-argument
-                        x_interval = bisect_left(x_data, x)
+                        x_interval = _cached_bisect_left(x_data, x, bisect_cache)
                         x_left = x_data[x_interval - 1]
                         y_left = y_data[x_interval - 1]
                         dx = float(x_data[x_interval] - x_left)
@@ -534,9 +575,10 @@ class Function:  # pylint: disable=too-many-public-methods
                 self._interpolation_func = polynomial_interpolation
 
             case 2:  # akima
+                bisect_cache = [1]
 
                 def akima_interpolation(x, x_min, x_max, x_data, y_data, coeffs):  # pylint: disable=unused-argument
-                    x_interval = bisect_left(x_data, x)
+                    x_interval = _cached_bisect_left(x_data, x, bisect_cache)
                     x_interval = x_interval if x_interval != 0 else 1
                     a = coeffs[4 * x_interval - 4 : 4 * x_interval]
                     return a[3] * x**3 + a[2] * x**2 + a[1] * x + a[0]
@@ -544,9 +586,10 @@ class Function:  # pylint: disable=too-many-public-methods
                 self._interpolation_func = akima_interpolation
 
             case 3:  # spline
+                bisect_cache = [1]
 
                 def spline_interpolation(x, x_min, x_max, x_data, y_data, coeffs):  # pylint: disable=unused-argument
-                    x_interval = bisect_left(x_data, x)
+                    x_interval = _cached_bisect_left(x_data, x, bisect_cache)
                     x_interval = max(x_interval, 1)
                     a = coeffs[:, x_interval - 1]
                     x = x - x_data[x_interval - 1]
