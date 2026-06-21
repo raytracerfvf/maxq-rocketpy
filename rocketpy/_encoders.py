@@ -188,10 +188,13 @@ def set_minimal_flight_attributes(flight, obj):
         try:
             setattr(flight, attribute, obj[attribute])
         except KeyError:
-            # Manual resolution of new attributes
+            # Manual resolution of attributes missing from older .rpy files
             if attribute == "net_thrust":
                 flight.net_thrust = obj["rocket"].motor.thrust
                 flight.net_thrust.set_discrete_based_on_model(flight.speed)
+            elif attribute == "max_wall_time":
+                # Added in the max_wall_time watchdog; default off for old files.
+                flight.max_wall_time = None
 
     flight.t_initial = flight.initial_solution[0]
 

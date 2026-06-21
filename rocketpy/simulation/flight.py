@@ -37,6 +37,12 @@ ODE_SOLVER_MAP = {
     "LSODA": LSODA,
 }
 
+# Smallest burn-phase max_step the clamp is allowed to impose, in seconds.
+# Real motors burn far longer than ~10 us (so burn_out/10 stays well above this),
+# while degenerate/placeholder motors (e.g. burn_out_time=1e-10 s) would otherwise
+# clamp max_step to ~1e-11 s and stall the integrator for the whole phase.
+MIN_BURN_CLAMP_STEP = 1e-6
+
 
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-instance-attributes
@@ -675,12 +681,20 @@ class Flight:
 
             # Adaptive solvers can step over an impulsive burn entirely when
             # thrust is zero at both endpoints; clamp during the burn phase only.
+            # Degenerate burns (burn_out/10 below MIN_BURN_CLAMP_STEP, or below the
+            # user's min_time_step) are skipped so the clamp can't drive max_step to
+            # an unusably small value and stall the integrator for the whole phase.
             phase_max_step = self.max_time_step
             motor = self.rocket.motor
             burn_out = float(getattr(motor, "burn_out_time", 0) or 0)
             total_impulse = float(getattr(motor, "total_impulse", 0) or 0)
-            if total_impulse > 0 and burn_out > 0 and phase.t < burn_out:
-                phase_max_step = min(phase_max_step, burn_out / 10)
+            burn_max_step = burn_out / 10
+            if (
+                total_impulse > 0
+                and phase.t < burn_out
+                and burn_max_step >= max(self.min_time_step, MIN_BURN_CLAMP_STEP)
+            ):
+                phase_max_step = min(phase_max_step, burn_max_step)
 
             phase.solver = self._solver(
                 phase.derivative,
