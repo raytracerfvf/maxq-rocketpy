@@ -1,3 +1,6 @@
+> [!NOTE]
+> **This is [ZenRockets](https://zenrockets.com)' maintained fork of [RocketPy](https://github.com/RocketPy-Team/RocketPy)**, powering the flight simulation service behind [zenrockets.com](https://zenrockets.com), a browser-based rocket design and simulation tool. Modified by ZenRockets, 2026. Changes include symmetric multi-engine cluster support, simulation robustness fixes (ODE step clamping during burn, wall-time watchdog, solver failure handling), and time-aware parachute triggers — see the [full diff against upstream](https://github.com/RocketPy-Team/RocketPy/compare/master...raytracerfvf:maxq-rocketpy:master) for details. For the canonical project, use upstream RocketPy.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/RocketPy-Team/RocketPy/master/docs/static/RocketPy_Logo_white.png">
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/RocketPy-Team/RocketPy/master/docs/static/RocketPy_Logo_black.png">
